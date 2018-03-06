@@ -7,25 +7,33 @@ import (
 	"log"
 	"os"
 	"path"
+	"strconv"
+
+	"github.com/kniren/gota/dataframe"
 )
+
+type CSVRecord struct {
+	SepalLength float64
+	SepalWidth  float64
+	PetalLength float64
+	PetalWidth  float64
+	Species     string
+	ParseError  error
+}
 
 func main() {
 
-	f, err := os.Open(path.Join(path.Dir(os.Args[0]), "../data/iris.cvs"))
+	file, err := os.Open(path.Join(path.Dir(os.Args[0]), "../data/iris.cvs"))
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer f.Close()
+	defer file.Close()
 
-	reader := csv.NewReader(f)
+	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = 0
 
-	reader.FieldsPerRecord = -1
-
-	//rawCSVData, err := reader.ReadAll()
-	//if err != nil {
-	//	log.Fatal(err)
-	//}
-	//fmt.Println(rawCSVData)
+	var csvRecord CSVRecord
+	var csvData []CSVRecord
 
 	for {
 		record, err := reader.Read()
@@ -33,12 +41,54 @@ func main() {
 			log.Println("reached EOF")
 			break
 		}
-		if err != nil {
-			log.Println(err)
-			continue
+
+		for i, value := range record {
+
+			var floatVal float64
+
+			if i == 4 {
+				if value == "" {
+					log.Printf("Unexpected type in column %d\n", i)
+					csvRecord.ParseError = fmt.Errorf("Empty string value")
+					break
+				}
+
+				csvRecord.Species = value
+			}
+
+			if floatVal, err = strconv.ParseFloat(value, 64); err != nil {
+				log.Printf("Unexpected type in column %d\n", i)
+				csvRecord.ParseError = fmt.Errorf("could not parse float : %s", value)
+				break
+			}
+
+			switch i {
+			case 0:
+				csvRecord.SepalLength = floatVal
+			case 1:
+				csvRecord.SepalWidth = floatVal
+			case 2:
+				csvRecord.PetalLength = floatVal
+			case 3:
+				csvRecord.PetalWidth = floatVal
+			}
 		}
 
-		fmt.Println(record)
+		if csvRecord.ParseError == nil {
+			csvData = append(csvData, csvRecord)
+		}
 	}
 
+	csvDF := dataframe.LoadStructs(csvData)
+	irisDF := dataframe.ReadCSV(file)
+
+	fmt.Println(csvDF)
+
+	fmt.Println(irisDF)
+
+	//versiColorDF := irisDF.Filter(dataframe.F{
+	//	Colname:    "species",
+	//	Comparator: "==",
+	//	Comparando: "Iris-versicolor",
+	//}).Select()
 }
