@@ -5,16 +5,12 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"math"
 	"os"
 	"strconv"
-
-	"gonum.org/v1/gonum/stat"
 )
 
 func main() {
-	// Open the continuous observations and predictions.
-	f, err := os.Open("../data/continuous_data.csv")
+	f, err := os.Open("../data/labeled.csv")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -22,18 +18,15 @@ func main() {
 
 	// Create a new CSV reader reading from the opened file.
 	reader := csv.NewReader(f)
-
 	// observed and predicted will hold the parsed observed and predicted values
-	// form the continuous data file.
-	var observed []float64
-	var predicted []float64
+	// form the labeled data file.
+	var observed []int
+	var predicted []int
 
 	// line will track row numbers for logging.
 	line := 1
-
 	// Read in the records looking for unexpected types in the columns.
 	for {
-
 		// Read in a row. Check if we are at the end of the file.
 		record, err := reader.Read()
 		if err == io.EOF {
@@ -47,13 +40,13 @@ func main() {
 		}
 
 		// Read in the observed and predicted values.
-		observedVal, err := strconv.ParseFloat(record[0], 64)
+		observedVal, err := strconv.Atoi(record[0])
 		if err != nil {
 			log.Printf("Parsing line %d failed, unexpected type\n", line)
 			continue
 		}
 
-		predictedVal, err := strconv.ParseFloat(record[1], 64)
+		predictedVal, err := strconv.Atoi(record[1])
 		if err != nil {
 			log.Printf("Parsing line %d failed, unexpected type\n", line)
 			continue
@@ -64,23 +57,18 @@ func main() {
 		predicted = append(predicted, predictedVal)
 		line++
 	}
+	// This variable will hold our count of true positive and
+	// true negative values.
+	var truePosNeg int
 
-	// Calculate the mean absolute error and mean squared error.
-	var mAE float64
-	var mSE float64
+	// Accumulate the true positive/negative count.
 	for idx, oVal := range observed {
-		mAE += math.Abs(oVal-predicted[idx]) / float64(len(observed))
-		mSE += math.Pow(oVal-predicted[idx], 2) / float64(len(observed))
+		if oVal == predicted[idx] {
+			truePosNeg++
+		}
 	}
-
-	// Output the MAE and MSE value to standard out.
-	fmt.Printf("\nMSE = %0.2f\n\n", mSE) //average of the squares of all the errors
-	fmt.Printf("\nMAE = %0.2f\n", mAE)   //average of the absolute values of all the errors
-
-	// Calculate the R^2 value.
-	rSquared := stat.RSquaredFrom(observed, predicted, nil) // the proportion of the variance in the observed values that we capture in the predicted values
-
-	// Output the R^2 value to standard out.
-	fmt.Printf("\nR^2 = %0.2f\n\n", rSquared)
-
+	// Calculate the accuracy (subset accuracy).
+	accuracy := float64(truePosNeg) / float64(len(observed))
+	// Output the Accuracy value to standard out.
+	fmt.Printf("\nAccuracy = %0.2f\n\n", accuracy)
 }
